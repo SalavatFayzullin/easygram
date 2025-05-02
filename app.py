@@ -1,12 +1,19 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
+from wtforms import StringField, TextAreaField, SubmitField
+from wtforms.validators import DataRequired, Length
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from models import db, User, Message, Group, GroupMembership, GroupMessage
 import os
 import time
 import threading
 from datetime import datetime
+import secrets
+from PIL import Image
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
@@ -19,6 +26,17 @@ csrf = CSRFProtect(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+# Create profile pictures directory if it doesn't exist
+if not os.path.exists('static/profile_pics'):
+    os.makedirs('static/profile_pics')
+
+# Profile update form
+class ProfileUpdateForm(FlaskForm):
+    bio = TextAreaField('Bio', validators=[Length(max=500)])
+    profile_picture = FileField('Update Profile Picture', 
+                               validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif'], 'Images only!')])
+    submit = SubmitField('Update')
 
 # Dictionary to track online users and their last activity timestamp
 online_users = {}
@@ -220,10 +238,10 @@ def api_send_message(recipient_id):
 
 @app.route('/')
 def home():
-    # Update user's online status if logged in
+    # Redirect to dashboard if logged in, otherwise to login page
     if current_user.is_authenticated:
-        update_user_activity(current_user.id)
-    return render_template('home.html')
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
 
 @app.route('/dashboard')
 @login_required
@@ -447,9 +465,71 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('home'))
+    flash('You have been logged out', 'success')
+    return redirect(url_for('login'))
 
-# Group routes
+def save_profile_picture(form_picture):
+    """Save the uploaded profile picture with a random name and resize it"""
+    # Generate a random hex for unique filename
+    random_hex = secrets.token_hex(8)
+    
+    # Get the file extension from the uploaded picture
+    _, f_ext = os.path.splitext(form_picture.filename)
+    picture_filename = random_hex + f_ext
+    
+    # Define the path where the picture will be saved
+    picture_path = os.path.join(app.root_path, 'static/profile_pics', picture_filename)
+    
+    # Resize the image to save space and ensure consistent display
+    output_size = (200, 200)
+    img = Image.open(form_picture)
+    img.thumbnail(output_size)
+    
+    # Save the image
+    img.save(picture_path)
+    
+    return picture_filename
+
+@app.route('/profile/<string:username>')
+@login_required
+def profile(username):
+    # Update user's online status
+    update_user_activity(current_user.id)
+    
+    # Get the user from the database
+    user = User.query.filter_by(username=username).first_or_404()
+    
+    return render_template('profile.html', user=user, title=f"{user.username}'s Profile")
+
+@app.route('/edit-profile', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    # Update user's online status
+    update_user_activity(current_user.id)
+    
+    form = ProfileUpdateForm()
+    
+    if form.validate_on_submit():
+        # Only update the profile picture if one was uploaded
+        if form.profile_picture.data:
+            profile_pic_file = save_profile_picture(form.profile_picture.data)
+            current_user.profile_image = profile_pic_file
+        
+        # Update the bio
+        current_user.bio = form.bio.data
+        
+        # Commit the changes to the database
+        db.session.commit()
+        
+        flash('Your profile has been updated!', 'success')
+        return redirect(url_for('profile', username=current_user.username))
+    
+    # Pre-populate the form with current data
+    elif request.method == 'GET':
+        form.bio.data = current_user.bio
+    
+    return render_template('edit_profile.html', form=form, title='Edit Profile')
+
 @app.route('/create-group', methods=['GET', 'POST'])
 @login_required
 def create_group():

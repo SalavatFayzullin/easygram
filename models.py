@@ -9,6 +9,8 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(20), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(60), nullable=False)
+    bio = db.Column(db.Text, nullable=True)
+    profile_image = db.Column(db.String(120), default='default.jpg')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     # Add relationships for chats

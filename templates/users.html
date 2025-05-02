@@ -3,6 +3,21 @@
 {% block title %}Users - Flask Auth App{% endblock %}
 
 {% block content %}
+<style>
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-right: 15px;
+    }
+    
+    .user-info {
+        display: flex;
+        align-items: center;
+    }
+</style>
+
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
@@ -11,19 +26,40 @@
                 <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-light">Back to Dashboard</a>
             </div>
             <div class="card-body">
+                <!-- Search bar -->
+                <div class="mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="user-search" class="form-control" placeholder="Search users by name...">
+                        <button class="btn btn-outline-secondary" type="button" id="clear-search">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <small class="form-text text-muted">Type to filter users by name</small>
+                </div>
+                
+                <!-- No results message (hidden by default) -->
+                <div id="no-results-message" class="alert alert-info d-none">
+                    No users found matching your search.
+                </div>
+                
                 {% if users %}
                 <div class="list-group" id="users-list">
                     {% for user in users %}
                         {% if user.id != current_user.id %}
                         <a href="{{ url_for('chat', user_id=user.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-user-id="{{ user.id }}">
-                            <div>
-                                <h5 class="mb-1">
-                                    {{ user.username }}
-                                    <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
-                                        {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
-                                    </span>
-                                </h5>
-                                <small class="text-muted">Member since {{ user.created_at.strftime('%Y-%m-%d') }}</small>
+                            <div class="user-info">
+                                <img src="{{ url_for('static', filename='profile_pics/' + user.profile_image) }}" 
+                                     alt="{{ user.username }}" class="user-avatar">
+                                <div>
+                                    <h5 class="mb-1">
+                                        {{ user.username }}
+                                        <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
+                                            {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
+                                        </span>
+                                    </h5>
+                                    <small class="text-muted">Member since {{ user.created_at.strftime('%Y-%m-%d') }}</small>
+                                </div>
                             </div>
                             <span class="btn btn-sm btn-outline-primary">Chat</span>
                         </a>
@@ -44,6 +80,50 @@
     document.addEventListener('DOMContentLoaded', function() {
         // CSRF token for AJAX requests
         const csrfToken = "{{ csrf_token() }}";
+        
+        // User search functionality
+        const userSearch = document.getElementById('user-search');
+        const clearSearch = document.getElementById('clear-search');
+        const usersList = document.getElementById('users-list');
+        const noResultsMessage = document.getElementById('no-results-message');
+        
+        if (userSearch && usersList) {
+            userSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                let visibleCount = 0;
+                
+                // Get all user items
+                const userItems = usersList.querySelectorAll('.list-group-item');
+                
+                // Filter user items
+                userItems.forEach(item => {
+                    const username = item.querySelector('h5').textContent.toLowerCase();
+                    
+                    if (username.includes(searchTerm)) {
+                        item.style.display = '';
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                
+                // Show/hide no results message
+                if (visibleCount === 0 && searchTerm !== '') {
+                    noResultsMessage.classList.remove('d-none');
+                } else {
+                    noResultsMessage.classList.add('d-none');
+                }
+            });
+            
+            // Clear search button
+            if (clearSearch) {
+                clearSearch.addEventListener('click', function() {
+                    userSearch.value = '';
+                    userSearch.dispatchEvent(new Event('input'));
+                    userSearch.focus();
+                });
+            }
+        }
         
         // Function to update user status indicators
         function updateUserStatus(userId, isOnline) {

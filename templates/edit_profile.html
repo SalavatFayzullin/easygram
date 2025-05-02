@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Edit Profile</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3 text-center">
+                            <div class="mb-3">
+                                <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_image) }}" 
+                                    alt="Current Profile Picture" class="rounded-circle" 
+                                    style="width: 150px; height: 150px; object-fit: cover;">
+                            </div>
+                            <div class="mb-3">
+                                {{ form.profile_picture.label(class="form-label") }}
+                                {{ form.profile_picture(class="form-control") }}
+                                {% if form.profile_picture.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.profile_picture.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <small class="form-text text-muted">Recommended size: 200x200 pixels</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.bio.label(class="form-label") }}
+                            {{ form.bio(class="form-control", rows=5) }}
+                            {% if form.bio.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.bio.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Tell us a little about yourself</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.submit(class="btn btn-primary") }}
+                            <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -3,29 +3,99 @@
 {% block title %}Dashboard - Flask Auth App{% endblock %}
 
 {% block content %}
+<style>
+    /* Profile card styles */
+    .profile-img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+        margin: 0 auto;
+    }
+    
+    @media (max-width: 767px) {
+        /* Smaller image on mobile */
+        .profile-img {
+            width: 100px;
+            height: 100px;
+        }
+        
+        /* More compact spacing on mobile */
+        .profile-card .card-body {
+            padding: 1rem;
+        }
+        
+        /* Smaller buttons on mobile */
+        .profile-card .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+    }
+    
+    .profile-bio {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    /* Chat user avatar styles */
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+    
+    .chat-header-avatar {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .flex-center {
+        display: flex;
+        align-items: center;
+    }
+</style>
+
 <div class="row">
     <!-- Left Panel - User Info and Chat List -->
     <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-primary text-white">
-                <h3 class="mb-0">Welcome, {{ current_user.username }}!</h3>
+        <div class="card mb-3 profile-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">My Profile</h3>
+                <button class="btn btn-sm btn-light d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#profileCollapse" aria-expanded="false" aria-controls="profileCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
             </div>
-            <div class="card-body">
-                <p><strong>Email:</strong> {{ current_user.email }}</p>
-                <p><strong>Account Created:</strong> {{ current_user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
-            </div>
-        </div>
-        
-        <!-- Search Bar -->
-        <div class="card mb-3">
-            <div class="card-body p-2">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" id="chat-search" class="form-control" placeholder="Search users and groups...">
-                    <button class="btn btn-outline-secondary" type="button" id="clear-search">
-                        <i class="bi bi-x"></i>
-                    </button>
+            <div class="collapse show" id="profileCollapse">
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_image) }}" 
+                         alt="{{ current_user.username }}" class="rounded-circle img-fluid mb-3 profile-img">
+                    <h4>{{ current_user.username }}</h4>
+                    <p class="text-muted mb-1">{{ current_user.email }}</p>
+                    <p class="text-muted mb-3">Member since {{ current_user.created_at.strftime('%B %d, %Y') }}</p>
+                    
+                    <div class="mb-3">
+                        <h5>Bio</h5>
+                        <div class="profile-bio">
+                            {% if current_user.bio %}
+                                {{ current_user.bio|safe }}
+                            {% else %}
+                                <em>You haven't added a bio yet.</em>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-center">
+                        <a href="{{ url_for('edit_profile') }}" class="btn btn-primary me-2">
+                            <i class="bi bi-pencil"></i> Edit Profile
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="btn btn-danger">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -65,12 +135,16 @@
                                 class="list-group-item list-group-item-action {% if selected_user and selected_user.id == user.id %}active{% endif %}" 
                                 data-user-id="{{ user.id }}">
                                 <div class="d-flex w-100 justify-content-between">
-                                    <h5 class="mb-1">
-                                        {{ user.username }}
-                                        <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
-                                            {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
-                                        </span>
-                                    </h5>
+                                    <div class="flex-center">
+                                        <img src="{{ url_for('static', filename='profile_pics/' + user.profile_image) }}" 
+                                             alt="{{ user.username }}" class="user-avatar">
+                                        <h5 class="mb-1">
+                                            {{ user.username }}
+                                            <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
+                                                {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
+                                            </span>
+                                        </h5>
+                                    </div>
                                     {% set last_message = current_user.last_message_with(user.id) %}
                                     {% if last_message %}
                                     <small class="time-display {% if selected_user and selected_user.id == user.id %}text-light{% endif %}">
@@ -120,7 +194,7 @@
                                 class="list-group-item list-group-item-action {% if selected_group and selected_group.id == group.id %}active{% endif %}" 
                                 data-group-id="{{ group.id }}">
                                 <div class="d-flex w-100 justify-content-between">
-                                    <div>
+                                    <div class="flex-center">
                                         <h5 class="mb-1">
                                             {{ group.name }}
                                             {% if group.creator_id == current_user.id %}
@@ -174,12 +248,16 @@
         <!-- Direct Chat Area -->
         <div class="card" id="chat-area">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">
-                    {{ selected_user.username }}
-                    <span class="user-status-indicator badge {% if online_status[selected_user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ selected_user.id }}">
-                        {% if online_status[selected_user.id] %}Online{% else %}Offline{% endif %}
-                    </span>
-                </h4>
+                <div class="flex-center">
+                    <img src="{{ url_for('static', filename='profile_pics/' + selected_user.profile_image) }}" 
+                         alt="{{ selected_user.username }}" class="chat-header-avatar">
+                    <h4 class="mb-0">
+                        {{ selected_user.username }}
+                        <span class="user-status-indicator badge {% if online_status[selected_user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ selected_user.id }}">
+                            {% if online_status[selected_user.id] %}Online{% else %}Offline{% endif %}
+                        </span>
+                    </h4>
+                </div>
             </div>
             <div class="card-body" id="messages-container" style="height: 400px; overflow-y: auto;">
                 <div id="messages-list">
@@ -189,6 +267,12 @@
                     
                     {% for message in messages %}
                     <div class="message mb-2 {% if message.sender_id == current_user.id %}text-end{% endif %}">
+                        {% if message.sender_id != current_user.id %}
+                        <div class="d-flex align-items-start">
+                            <img src="{{ url_for('static', filename='profile_pics/' + selected_user.profile_image) }}" 
+                                 alt="{{ selected_user.username }}" 
+                                 class="user-avatar" style="width: 32px; height: 32px; margin-right: 8px;">
+                        {% endif %}
                         <div class="message-bubble p-2 rounded d-inline-block {% if message.sender_id == current_user.id %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 75%;">
                             {{ message.body }}
                             <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
@@ -200,6 +284,9 @@
                                 {% endif %}
                             </div>
                         </div>
+                        {% if message.sender_id != current_user.id %}
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -218,12 +305,14 @@
         <!-- Group Chat Area -->
         <div class="card" id="group-chat-area">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">
-                    {{ selected_group.name }}
-                    {% if selected_group.creator_id == current_user.id %}
-                    <span class="badge bg-primary rounded-pill ms-2">Admin</span>
-                    {% endif %}
-                </h4>
+                <div class="flex-center">
+                    <h4 class="mb-0">
+                        {{ selected_group.name }}
+                        {% if selected_group.creator_id == current_user.id %}
+                        <span class="badge bg-primary rounded-pill ms-2">Admin</span>
+                        {% endif %}
+                    </h4>
+                </div>
                 <a href="{{ url_for('group_members', group_id=selected_group.id) }}" class="btn btn-sm btn-light">
                     <i class="bi bi-people"></i> Members
                 </a>
@@ -234,6 +323,12 @@
                     
                     {% for message in group_messages %}
                     <div class="message mb-2 {% if message.sender_id == current_user.id %}text-end{% endif %}" data-message-id="{{ message.id }}">
+                        {% if message.sender_id != current_user.id %}
+                        <div class="d-flex align-items-start">
+                            <img src="{{ url_for('static', filename='profile_pics/' + message.sender.profile_image) }}" 
+                                 alt="{{ message.sender.username }}" 
+                                 class="user-avatar" style="width: 32px; height: 32px; margin-right: 8px;">
+                        {% endif %}
                         <div class="message-bubble p-2 rounded d-inline-block {% if message.sender_id == current_user.id %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 75%;">
                             {% if message.sender_id != current_user.id %}
                             <div class="message-sender mb-1 text-primary">{{ message.sender.username }}</div>
@@ -243,6 +338,9 @@
                                 <small class="text-muted">{{ message.timestamp.strftime('%H:%M | %b %d') }}</small>
                             </div>
                         </div>
+                        {% if message.sender_id != current_user.id %}
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -285,71 +383,6 @@
         const messagesContainer = document.getElementById('messages-container');
         const groupMessageForm = document.getElementById('group-message-form');
         const groupMessagesContainer = document.getElementById('group-messages-container');
-        const searchInput = document.getElementById('chat-search');
-        const clearSearchBtn = document.getElementById('clear-search');
-        
-        // Search functionality
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase().trim();
-                
-                // Filter direct chat users
-                const chatUsers = document.querySelectorAll('#chat-list .list-group-item');
-                chatUsers.forEach(user => {
-                    const username = user.querySelector('h5').textContent.toLowerCase();
-                    const messagePreview = user.querySelector('.message-preview')?.textContent.toLowerCase() || '';
-                    
-                    if (username.includes(searchTerm) || messagePreview.includes(searchTerm)) {
-                        user.style.display = '';
-                    } else {
-                        user.style.display = 'none';
-                    }
-                });
-                
-                // Filter group chats
-                const groupChats = document.querySelectorAll('#group-list .list-group-item');
-                groupChats.forEach(group => {
-                    const groupName = group.querySelector('h5').textContent.toLowerCase();
-                    const messagePreview = group.querySelector('.group-message-preview')?.textContent.toLowerCase() || '';
-                    
-                    if (groupName.includes(searchTerm) || messagePreview.includes(searchTerm)) {
-                        group.style.display = '';
-                    } else {
-                        group.style.display = 'none';
-                    }
-                });
-                
-                // Show no results message if needed
-                const activeTab = document.querySelector('.tab-pane.active');
-                if (activeTab) {
-                    const visibleItems = activeTab.querySelectorAll('.list-group-item[style="display: ;"], .list-group-item:not([style])');
-                    
-                    let noResultsMsg = activeTab.querySelector('.no-results-message');
-                    if (visibleItems.length === 0 && searchTerm) {
-                        if (!noResultsMsg) {
-                            noResultsMsg = document.createElement('div');
-                            noResultsMsg.className = 'no-results-message text-center p-3 text-muted';
-                            noResultsMsg.textContent = 'No matches found';
-                            
-                            const listGroup = activeTab.querySelector('.list-group');
-                            if (listGroup) {
-                                listGroup.appendChild(noResultsMsg);
-                            }
-                        }
-                    } else if (noResultsMsg) {
-                        noResultsMsg.remove();
-                    }
-                }
-            });
-            
-            // Clear search button
-            if (clearSearchBtn) {
-                clearSearchBtn.addEventListener('click', function() {
-                    searchInput.value = '';
-                    searchInput.dispatchEvent(new Event('input'));
-                });
-            }
-        }
         
         // Set up beforeunload event to mark user as offline when leaving
         window.addEventListener('beforeunload', function() {
@@ -450,15 +483,36 @@
                         messageDiv.className = 'message mb-2 text-end';
                         messageDiv.setAttribute('data-message-id', data.id);
                         
-                        messageDiv.innerHTML = `
-                            <div class="message-bubble p-2 rounded d-inline-block bg-primary text-white" style="max-width: 75%;">
-                                ${data.body}
-                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
-                                    <small class="text-muted">${data.timestamp}</small>
+                        // Build message HTML content
+                        if (data.sender_id == {{ current_user.id }}) {
+                            // Current user's message (right-aligned)
+                            messageDiv.innerHTML = `
+                                <div class="message-bubble p-2 rounded d-inline-block bg-primary text-white" style="max-width: 75%;">
+                                    ${data.body}
+                                    <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                        <small class="text-muted">${data.timestamp}</small>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
+                            `;
+                        } else {
+                            // Other user's message (left-aligned with avatar)
+                            messageDiv.innerHTML = `
+                                <div class="d-flex align-items-start">
+                                    <img src="{{ url_for('static', filename='profile_pics/default.jpg') }}" 
+                                         alt="${data.sender_username}" 
+                                         class="user-avatar" style="width: 32px; height: 32px; margin-right: 8px;">
+                                    <div class="message-bubble p-2 rounded d-inline-block bg-light" style="max-width: 75%;">
+                                        <div class="message-sender mb-1 text-primary">${data.sender_username}</div>
+                                        ${data.body}
+                                        <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                            <small class="text-muted">${data.timestamp}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
                         
+                        // Add to messages list
                         messagesList.appendChild(messageDiv);
                         groupMessagesContainer.scrollTop = groupMessagesContainer.scrollHeight;
                         
@@ -532,10 +586,15 @@
                                     messageDiv.className = 'message mb-2';
                                     
                                     messageDiv.innerHTML = `
-                                        <div class="message-bubble p-2 rounded d-inline-block bg-light" style="max-width: 75%;">
-                                            ${message.body}
-                                            <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
-                                                <small class="text-muted">${message.timestamp}</small>
+                                        <div class="d-flex align-items-start">
+                                            <img src="{{ url_for('static', filename='profile_pics/' + selected_user.profile_image) }}" 
+                                                 alt="{{ selected_user.username }}" 
+                                                 class="user-avatar" style="width: 32px; height: 32px; margin-right: 8px;">
+                                            <div class="message-bubble p-2 rounded d-inline-block bg-light" style="max-width: 75%;">
+                                                ${message.body}
+                                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                                    <small class="text-muted">${message.timestamp}</small>
+                                                </div>
                                             </div>
                                         </div>
                                     `;
@@ -594,7 +653,7 @@
         {% endif %}
         
         {% if user_groups and selected_group %}
-        // Check for new group messages
+        // Function to check for new group messages
         function checkNewGroupMessages() {
             const groupId = {{ selected_group.id }};
             
@@ -634,23 +693,34 @@
                         messageDiv.className = message.sender_id == {{ current_user.id }} ? 'message mb-2 text-end' : 'message mb-2';
                         messageDiv.setAttribute('data-message-id', message.id);
                         
-                        // Create message content
-                        let senderInfo = '';
-                        if (message.sender_id != {{ current_user.id }}) {
-                            senderInfo = `<div class="message-sender mb-1 text-primary">${message.sender_username}</div>`;
-                        }
-                        
-                        const bubbleClass = message.sender_id == {{ current_user.id }} ? 'bg-primary text-white' : 'bg-light';
-                        
-                        messageDiv.innerHTML = `
-                            <div class="message-bubble p-2 rounded d-inline-block ${bubbleClass}" style="max-width: 75%;">
-                                ${senderInfo}
-                                ${message.body}
-                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
-                                    <small class="text-muted">${message.timestamp}</small>
+                        // Build message HTML content
+                        if (message.sender_id == {{ current_user.id }}) {
+                            // Current user's message (right-aligned)
+                            messageDiv.innerHTML = `
+                                <div class="message-bubble p-2 rounded d-inline-block bg-primary text-white" style="max-width: 75%;">
+                                    ${message.body}
+                                    <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                        <small class="text-muted">${message.timestamp}</small>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
+                            `;
+                        } else {
+                            // Other user's message (left-aligned with avatar)
+                            messageDiv.innerHTML = `
+                                <div class="d-flex align-items-start">
+                                    <img src="{{ url_for('static', filename='profile_pics/default.jpg') }}" 
+                                         alt="${message.sender_username}" 
+                                         class="user-avatar" style="width: 32px; height: 32px; margin-right: 8px;">
+                                    <div class="message-bubble p-2 rounded d-inline-block bg-light" style="max-width: 75%;">
+                                        <div class="message-sender mb-1 text-primary">${message.sender_username}</div>
+                                        ${message.body}
+                                        <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                            <small class="text-muted">${message.timestamp}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
                         
                         // Add to messages list
                         messagesList.appendChild(messageDiv);
@@ -710,6 +780,79 @@
         {% if chat_users %}
         setTimeout(checkNewMessages, 5000); // Start after 5 seconds
         {% endif %}
+        
+        // Responsive handling for profile section
+        const checkScreenSize = function() {
+            const profileCollapse = document.getElementById('profileCollapse');
+            if (profileCollapse) {
+                if (window.innerWidth < 768) { // md breakpoint in Bootstrap
+                    profileCollapse.classList.remove('show');
+                } else {
+                    profileCollapse.classList.add('show');
+                }
+            }
+        };
+        
+        // Check on load
+        checkScreenSize();
+        
+        // Check on resize
+        window.addEventListener('resize', checkScreenSize);
+    });
+
+    // Function to make usernames clickable
+    function makeUsernamesClickable() {
+        // Find all username elements in group messages
+        const senderElements = document.querySelectorAll('.message-sender');
+        
+        senderElements.forEach(function(element) {
+            // Skip if it's already been processed
+            if (element.querySelector('a')) {
+                return;
+            }
+            
+            // Get the username text
+            const username = element.textContent.trim();
+            
+            // Create the link element
+            const linkElement = document.createElement('a');
+            linkElement.href = `/profile/${username}`;
+            linkElement.className = 'text-primary text-decoration-none';
+            linkElement.textContent = username;
+            
+            // Replace the content with the link
+            element.innerHTML = '';
+            element.appendChild(linkElement);
+        });
+        
+        // Make avatars clickable too
+        const avatarImages = document.querySelectorAll('.user-avatar');
+        
+        avatarImages.forEach(function(img) {
+            // Skip if it's already wrapped in a link
+            if (img.parentElement.tagName === 'A') {
+                return;
+            }
+            
+            // Get the username from alt attribute
+            const username = img.getAttribute('alt');
+            if (!username) return;
+            
+            // Create a wrapper link
+            const linkElement = document.createElement('a');
+            linkElement.href = `/profile/${username}`;
+            
+            // Replace the image with the linked image
+            const parent = img.parentElement;
+            parent.insertBefore(linkElement, img);
+            linkElement.appendChild(img);
+        });
+    }
+    
+    // Run on page load and periodically to catch dynamic content
+    document.addEventListener('DOMContentLoaded', function() {
+        makeUsernamesClickable();
+        setInterval(makeUsernamesClickable, 1000);
     });
 </script>
 {% endblock %} 
