@@ -1,0 +1,9 @@
+venv/
+venvv/
+instance/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz

@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+
+{% block title %}Users - Flask Auth App{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">Users</h3>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-light">Back to Dashboard</a>
+            </div>
+            <div class="card-body">
+                {% if users %}
+                <div class="list-group" id="users-list">
+                    {% for user in users %}
+                        {% if user.id != current_user.id %}
+                        <a href="{{ url_for('chat', user_id=user.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-user-id="{{ user.id }}">
+                            <div>
+                                <h5 class="mb-1">
+                                    {{ user.username }}
+                                    <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
+                                        {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
+                                    </span>
+                                </h5>
+                                <small class="text-muted">Member since {{ user.created_at.strftime('%Y-%m-%d') }}</small>
+                            </div>
+                            <span class="btn btn-sm btn-outline-primary">Chat</span>
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="lead">No other users found in the system.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // CSRF token for AJAX requests
+        const csrfToken = "{{ csrf_token() }}";
+        
+        // Function to update user status indicators
+        function updateUserStatus(userId, isOnline) {
+            const statusIndicators = document.querySelectorAll(`.user-status-indicator[data-user-id="${userId}"]`);
+            statusIndicators.forEach(indicator => {
+                if (isOnline) {
+                    indicator.className = "user-status-indicator badge bg-success rounded-pill ms-2";
+                    indicator.textContent = "Online";
+                } else {
+                    indicator.className = "user-status-indicator badge bg-secondary rounded-pill ms-2";
+                    indicator.textContent = "Offline";
+                }
+            });
+        }
+        
+        // Function to poll for online status updates
+        function checkOnlineStatus() {
+            fetch('/api/online-status', {
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.online_users) {
+                        // Create a set of online user IDs for faster lookup
+                        const onlineUserIds = new Set(data.online_users.map(user => user.id));
+                        
+                        // Update status for all users in the list
+                        document.querySelectorAll('[data-user-id]').forEach(userElement => {
+                            const userId = parseInt(userElement.getAttribute('data-user-id'));
+                            updateUserStatus(userId, onlineUserIds.has(userId));
+                        });
+                    }
+                    
+                    // Check again after some time
+                    setTimeout(checkOnlineStatus, 10000); // Check every 10 seconds
+                })
+                .catch(error => {
+                    console.error('Error checking online status:', error);
+                    // Try again after a delay
+                    setTimeout(checkOnlineStatus, 5000);
+                });
+        }
+        
+        // Start checking for online status
+        checkOnlineStatus();
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,715 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - Flask Auth App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Left Panel - User Info and Chat List -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Welcome, {{ current_user.username }}!</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Email:</strong> {{ current_user.email }}</p>
+                <p><strong>Account Created:</strong> {{ current_user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
+            </div>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="card mb-3">
+            <div class="card-body p-2">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="chat-search" class="form-control" placeholder="Search users and groups...">
+                    <button class="btn btn-outline-secondary" type="button" id="clear-search">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat List Section with Tabs for Direct and Group Chats -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active text-dark" id="direct-tab" data-bs-toggle="tab" href="#direct-chats">Direct</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-dark" id="group-tab" data-bs-toggle="tab" href="#group-chats">Groups</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0">
+                <div id="unread-notification" class="alert alert-info m-2 d-none">
+                    <i class="bi bi-envelope"></i> You have <span id="unread-count">0</span> new message(s)! 
+                    <button class="btn btn-sm btn-outline-primary ms-2" onclick="location.reload()">Refresh</button>
+                </div>
+                
+                <div class="tab-content">
+                    <!-- Direct Messages Tab -->
+                    <div class="tab-pane fade show active" id="direct-chats">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light">
+                            <h5 class="mb-0">Direct Messages</h5>
+                            <a href="{{ url_for('users') }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-person-plus"></i> Find Users
+                            </a>
+                        </div>
+                        
+                        {% if chat_users %}
+                        <div class="list-group list-group-flush" id="chat-list">
+                            {% for user in chat_users %}
+                            <a href="{{ url_for('chat', user_id=user.id) }}" 
+                                class="list-group-item list-group-item-action {% if selected_user and selected_user.id == user.id %}active{% endif %}" 
+                                data-user-id="{{ user.id }}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">
+                                        {{ user.username }}
+                                        <span class="user-status-indicator badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ user.id }}">
+                                            {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
+                                        </span>
+                                    </h5>
+                                    {% set last_message = current_user.last_message_with(user.id) %}
+                                    {% if last_message %}
+                                    <small class="time-display {% if selected_user and selected_user.id == user.id %}text-light{% endif %}">
+                                        {{ last_message.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                        {% if not last_message.read and last_message.recipient_id == current_user.id %}
+                                        <span class="badge bg-danger rounded-pill ms-2 unread-badge" data-user-id="{{ user.id }}">New</span>
+                                        {% endif %}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                {% if last_message %}
+                                <p class="mb-1 text-truncate message-preview" data-user-id="{{ user.id }}">
+                                    {% if last_message.sender_id == current_user.id %}
+                                    <span class="text-muted">You: </span>
+                                    {% else %}
+                                    <span class="text-muted">{{ user.username }}: </span>
+                                    {% endif %}
+                                    {{ last_message.body }}
+                                </p>
+                                {% else %}
+                                <p class="mb-1 text-muted message-preview" data-user-id="{{ user.id }}">No messages yet</p>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <p class="lead mb-3">You don't have any direct chats yet.</p>
+                            <a href="{{ url_for('users') }}" class="btn btn-primary">Find Users to Chat With</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Group Chats Tab -->
+                    <div class="tab-pane fade" id="group-chats">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light">
+                            <h5 class="mb-0">Group Chats</h5>
+                            <a href="{{ url_for('create_group') }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-people"></i> New Group
+                            </a>
+                        </div>
+                        
+                        {% if user_groups %}
+                        <div class="list-group list-group-flush" id="group-list">
+                            {% for group in user_groups %}
+                            <a href="{{ url_for('group_chat', group_id=group.id) }}" 
+                                class="list-group-item list-group-item-action {% if selected_group and selected_group.id == group.id %}active{% endif %}" 
+                                data-group-id="{{ group.id }}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <div>
+                                        <h5 class="mb-1">
+                                            {{ group.name }}
+                                            {% if group.creator_id == current_user.id %}
+                                            <span class="badge bg-primary rounded-pill ms-2">Admin</span>
+                                            {% endif %}
+                                        </h5>
+                                        <small class="text-muted">{{ group.members.count() }} members</small>
+                                    </div>
+                                    {% set last_message = group.last_message() %}
+                                    {% if last_message %}
+                                    <small class="time-display {% if selected_group and selected_group.id == group.id %}text-light{% endif %}">
+                                        {{ last_message.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                {% if last_message %}
+                                <p class="mb-1 text-truncate group-message-preview" data-group-id="{{ group.id }}">
+                                    {% if last_message.sender_id == current_user.id %}
+                                    <span class="text-muted">You: </span>
+                                    {% else %}
+                                    <span class="text-muted">{{ last_message.sender.username }}: </span>
+                                    {% endif %}
+                                    {{ last_message.body }}
+                                </p>
+                                {% else %}
+                                <p class="mb-1 text-muted group-message-preview" data-group-id="{{ group.id }}">No messages yet</p>
+                                {% endif %}
+                                <div class="mt-1 text-end">
+                                    <a href="{{ url_for('group_members', group_id=group.id) }}" class="text-decoration-none">
+                                        <i class="bi bi-people"></i> Manage
+                                    </a>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <p class="lead mb-3">You're not in any groups yet.</p>
+                            <a href="{{ url_for('create_group') }}" class="btn btn-primary">Create a Group</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel - Chat Area -->
+    <div class="col-md-8">
+        {% if selected_user %}
+        <!-- Direct Chat Area -->
+        <div class="card" id="chat-area">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    {{ selected_user.username }}
+                    <span class="user-status-indicator badge {% if online_status[selected_user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2" data-user-id="{{ selected_user.id }}">
+                        {% if online_status[selected_user.id] %}Online{% else %}Offline{% endif %}
+                    </span>
+                </h4>
+            </div>
+            <div class="card-body" id="messages-container" style="height: 400px; overflow-y: auto;">
+                <div id="messages-list">
+                    {% set sent_messages = current_user.messages_sent.filter_by(recipient_id=selected_user.id).all() %}
+                    {% set received_messages = current_user.messages_received.filter_by(sender_id=selected_user.id).all() %}
+                    {% set messages = (sent_messages + received_messages)|sort(attribute='timestamp') %}
+                    
+                    {% for message in messages %}
+                    <div class="message mb-2 {% if message.sender_id == current_user.id %}text-end{% endif %}">
+                        <div class="message-bubble p-2 rounded d-inline-block {% if message.sender_id == current_user.id %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 75%;">
+                            {{ message.body }}
+                            <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                <small class="text-muted">{{ message.timestamp.strftime('%H:%M | %b %d') }}</small>
+                                {% if message.sender_id == current_user.id %}
+                                <small class="ms-2 {% if message.read %}text-success{% else %}text-muted{% endif %}">
+                                    <i class="bi {% if message.read %}bi-check-all{% else %}bi-check{% endif %}"></i>
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <form id="message-form" data-recipient="{{ selected_user.id }}" class="d-flex">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" id="message-input" class="form-control me-2" placeholder="Type a message...">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% elif selected_group %}
+        <!-- Group Chat Area -->
+        <div class="card" id="group-chat-area">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    {{ selected_group.name }}
+                    {% if selected_group.creator_id == current_user.id %}
+                    <span class="badge bg-primary rounded-pill ms-2">Admin</span>
+                    {% endif %}
+                </h4>
+                <a href="{{ url_for('group_members', group_id=selected_group.id) }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-people"></i> Members
+                </a>
+            </div>
+            <div class="card-body" id="group-messages-container" style="height: 400px; overflow-y: auto;">
+                <div id="group-messages-list">
+                    {% set group_messages = selected_group.get_ordered_messages() %}
+                    
+                    {% for message in group_messages %}
+                    <div class="message mb-2 {% if message.sender_id == current_user.id %}text-end{% endif %}" data-message-id="{{ message.id }}">
+                        <div class="message-bubble p-2 rounded d-inline-block {% if message.sender_id == current_user.id %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 75%;">
+                            {% if message.sender_id != current_user.id %}
+                            <div class="message-sender mb-1 text-primary">{{ message.sender.username }}</div>
+                            {% endif %}
+                            {{ message.body }}
+                            <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                <small class="text-muted">{{ message.timestamp.strftime('%H:%M | %b %d') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <form id="group-message-form" data-group="{{ selected_group.id }}" class="d-flex">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" id="group-message-input" class="form-control me-2" placeholder="Type a message...">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="card h-100 d-flex justify-content-center align-items-center">
+            <div class="text-center p-5">
+                <i class="bi bi-chat-dots" style="font-size: 5rem; color: #ccc;"></i>
+                <h3 class="mt-4">Select a chat to start messaging</h3>
+                <p class="text-muted">Choose a user or group from the list on the left or find new contacts</p>
+                <div class="mt-3">
+                    <a href="{{ url_for('users') }}" class="btn btn-primary me-2">Find Users</a>
+                    <a href="{{ url_for('create_group') }}" class="btn btn-success">Create Group</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // CSRF token for AJAX requests
+        const csrfToken = "{{ csrf_token() }}";
+        
+        // DOM elements
+        const unreadNotification = document.getElementById('unread-notification');
+        const unreadCount = document.getElementById('unread-count');
+        const messageForm = document.getElementById('message-form');
+        const messagesContainer = document.getElementById('messages-container');
+        const groupMessageForm = document.getElementById('group-message-form');
+        const groupMessagesContainer = document.getElementById('group-messages-container');
+        const searchInput = document.getElementById('chat-search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        
+        // Search functionality
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                
+                // Filter direct chat users
+                const chatUsers = document.querySelectorAll('#chat-list .list-group-item');
+                chatUsers.forEach(user => {
+                    const username = user.querySelector('h5').textContent.toLowerCase();
+                    const messagePreview = user.querySelector('.message-preview')?.textContent.toLowerCase() || '';
+                    
+                    if (username.includes(searchTerm) || messagePreview.includes(searchTerm)) {
+                        user.style.display = '';
+                    } else {
+                        user.style.display = 'none';
+                    }
+                });
+                
+                // Filter group chats
+                const groupChats = document.querySelectorAll('#group-list .list-group-item');
+                groupChats.forEach(group => {
+                    const groupName = group.querySelector('h5').textContent.toLowerCase();
+                    const messagePreview = group.querySelector('.group-message-preview')?.textContent.toLowerCase() || '';
+                    
+                    if (groupName.includes(searchTerm) || messagePreview.includes(searchTerm)) {
+                        group.style.display = '';
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+                
+                // Show no results message if needed
+                const activeTab = document.querySelector('.tab-pane.active');
+                if (activeTab) {
+                    const visibleItems = activeTab.querySelectorAll('.list-group-item[style="display: ;"], .list-group-item:not([style])');
+                    
+                    let noResultsMsg = activeTab.querySelector('.no-results-message');
+                    if (visibleItems.length === 0 && searchTerm) {
+                        if (!noResultsMsg) {
+                            noResultsMsg = document.createElement('div');
+                            noResultsMsg.className = 'no-results-message text-center p-3 text-muted';
+                            noResultsMsg.textContent = 'No matches found';
+                            
+                            const listGroup = activeTab.querySelector('.list-group');
+                            if (listGroup) {
+                                listGroup.appendChild(noResultsMsg);
+                            }
+                        }
+                    } else if (noResultsMsg) {
+                        noResultsMsg.remove();
+                    }
+                }
+            });
+            
+            // Clear search button
+            if (clearSearchBtn) {
+                clearSearchBtn.addEventListener('click', function() {
+                    searchInput.value = '';
+                    searchInput.dispatchEvent(new Event('input'));
+                });
+            }
+        }
+        
+        // Set up beforeunload event to mark user as offline when leaving
+        window.addEventListener('beforeunload', function() {
+            // Use sendBeacon for more reliable delivery during page unload
+            navigator.sendBeacon('/api/set-offline', new Blob([JSON.stringify({
+                csrf_token: csrfToken
+            })], {type: 'application/json'}));
+        });
+        
+        // Scroll to bottom of messages container
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        if (groupMessagesContainer) {
+            groupMessagesContainer.scrollTop = groupMessagesContainer.scrollHeight;
+        }
+        
+        // Handle direct message form submission
+        if (messageForm) {
+            messageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const messageInput = document.getElementById('message-input');
+                const message = messageInput.value.trim();
+                
+                if (message) {
+                    const recipientId = this.getAttribute('data-recipient');
+                    
+                    fetch(`/api/send_message/${recipientId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            message: message
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Add message to the UI
+                        const messagesList = document.getElementById('messages-list');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message mb-2 text-end';
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message-bubble p-2 rounded d-inline-block bg-primary text-white" style="max-width: 75%;">
+                                ${data.body}
+                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                    <small class="text-muted">${data.timestamp}</small>
+                                    <small class="ms-2 text-muted">
+                                        <i class="bi bi-check"></i>
+                                    </small>
+                                </div>
+                            </div>
+                        `;
+                        
+                        messagesList.appendChild(messageDiv);
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        
+                        // Clear input
+                        messageInput.value = '';
+                    })
+                    .catch(error => {
+                        console.error('Error sending message:', error);
+                    });
+                }
+            });
+        }
+        
+        // Handle group message form submission
+        if (groupMessageForm) {
+            groupMessageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const messageInput = document.getElementById('group-message-input');
+                const message = messageInput.value.trim();
+                
+                if (message) {
+                    const groupId = this.getAttribute('data-group');
+                    
+                    fetch(`/api/group/${groupId}/send-message`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            message: message
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Add message to the UI
+                        const messagesList = document.getElementById('group-messages-list');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message mb-2 text-end';
+                        messageDiv.setAttribute('data-message-id', data.id);
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message-bubble p-2 rounded d-inline-block bg-primary text-white" style="max-width: 75%;">
+                                ${data.body}
+                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                    <small class="text-muted">${data.timestamp}</small>
+                                </div>
+                            </div>
+                        `;
+                        
+                        messagesList.appendChild(messageDiv);
+                        groupMessagesContainer.scrollTop = groupMessagesContainer.scrollHeight;
+                        
+                        // Clear input
+                        messageInput.value = '';
+                    })
+                    .catch(error => {
+                        console.error('Error sending group message:', error);
+                    });
+                }
+            });
+        }
+        
+        {% if chat_users %}
+        // Create an array of chat users with their data
+        const chatUsers = [
+            {% for user in chat_users %}
+            {
+                id: {{ user.id }},
+                username: "{{ user.username }}",
+                lastMessageId: {% set last_message = current_user.last_message_with(user.id) %}{% if last_message %}{{ last_message.id }}{% else %}0{% endif %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        let totalUnread = 0;
+        
+        // Function to update user status indicators
+        function updateUserStatus(userId, isOnline) {
+            const statusIndicators = document.querySelectorAll(`.user-status-indicator[data-user-id="${userId}"]`);
+            statusIndicators.forEach(indicator => {
+                if (isOnline) {
+                    indicator.className = "user-status-indicator badge bg-success rounded-pill ms-2";
+                    indicator.textContent = "Online";
+                } else {
+                    indicator.className = "user-status-indicator badge bg-secondary rounded-pill ms-2";
+                    indicator.textContent = "Offline";
+                }
+            });
+        }
+        
+        // Function to check for new messages for all chat users
+        function checkNewMessages() {
+            let newMessagesFound = 0;
+            
+            // Check each user for new messages
+            chatUsers.forEach(user => {
+                // If we have a last message ID, use it to check for new messages
+                if (user.lastMessageId) {
+                    fetch(`/api/messages/${user.id}/${user.lastMessageId}`, {
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update online status
+                        if (data.hasOwnProperty('other_user_online')) {
+                            updateUserStatus(user.id, data.other_user_online);
+                        }
+                        
+                        // Process new messages
+                        if (data.messages && data.messages.length > 0) {
+                            // Add messages to the chat if user is selected
+                            {% if selected_user %}
+                            if (user.id === {{ selected_user.id }}) {
+                                const messagesList = document.getElementById('messages-list');
+                                
+                                data.messages.forEach(message => {
+                                    const messageDiv = document.createElement('div');
+                                    messageDiv.className = 'message mb-2';
+                                    
+                                    messageDiv.innerHTML = `
+                                        <div class="message-bubble p-2 rounded d-inline-block bg-light" style="max-width: 75%;">
+                                            ${message.body}
+                                            <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                                <small class="text-muted">${message.timestamp}</small>
+                                            </div>
+                                        </div>
+                                    `;
+                                    
+                                    messagesList.appendChild(messageDiv);
+                                });
+                                
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }
+                            {% endif %}
+                            
+                            // Update the badge
+                            const badge = document.querySelector(`.unread-badge[data-user-id="${user.id}"]`);
+                            if (!badge) {
+                                // Create new badge if it doesn't exist
+                                const timeDisplay = document.querySelector(`.list-group-item[data-user-id="${user.id}"] .time-display`);
+                                if (timeDisplay) {
+                                    const newBadge = document.createElement('span');
+                                    newBadge.className = 'badge bg-danger rounded-pill ms-2 unread-badge';
+                                    newBadge.setAttribute('data-user-id', user.id);
+                                    newBadge.textContent = 'New';
+                                    timeDisplay.appendChild(newBadge);
+                                }
+                            }
+                            
+                            // Update preview text with latest message
+                            const latestMessage = data.messages[data.messages.length - 1];
+                            const preview = document.querySelector(`.message-preview[data-user-id="${user.id}"]`);
+                            if (preview) {
+                                preview.innerHTML = `<span class="text-muted">${user.username}: </span>${latestMessage.body}`;
+                            }
+                            
+                            // Update the last message ID
+                            user.lastMessageId = latestMessage.id;
+                            
+                            // Increment unread count
+                            newMessagesFound += data.messages.length;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking for new messages:', error);
+                    });
+                }
+            });
+            
+            // Update notification if new messages found
+            if (newMessagesFound > 0) {
+                totalUnread += newMessagesFound;
+                unreadCount.textContent = totalUnread;
+                unreadNotification.classList.remove('d-none');
+            }
+            
+            // Check again after some time
+            setTimeout(checkNewMessages, 10000); // Check every 10 seconds
+        }
+        {% endif %}
+        
+        {% if user_groups and selected_group %}
+        // Check for new group messages
+        function checkNewGroupMessages() {
+            const groupId = {{ selected_group.id }};
+            
+            // Find the highest message ID currently displayed
+            let lastGroupMessageId = 0;
+            const groupMessages = document.querySelectorAll('#group-messages-list .message');
+            if (groupMessages.length > 0) {
+                groupMessages.forEach(msg => {
+                    const msgId = parseInt(msg.getAttribute('data-message-id') || '0');
+                    if (msgId > lastGroupMessageId) {
+                        lastGroupMessageId = msgId;
+                    }
+                });
+            }
+            
+            // Fetch new messages
+            fetch(`/api/group/${groupId}/messages/${lastGroupMessageId}`, {
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.messages && data.messages.length > 0) {
+                    const messagesList = document.getElementById('group-messages-list');
+                    
+                    // Process each new message
+                    data.messages.forEach(message => {
+                        // Skip if this message is already shown
+                        const existingMessage = document.querySelector(`.message[data-message-id="${message.id}"]`);
+                        if (existingMessage) {
+                            return;
+                        }
+                        
+                        // Create message element
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = message.sender_id == {{ current_user.id }} ? 'message mb-2 text-end' : 'message mb-2';
+                        messageDiv.setAttribute('data-message-id', message.id);
+                        
+                        // Create message content
+                        let senderInfo = '';
+                        if (message.sender_id != {{ current_user.id }}) {
+                            senderInfo = `<div class="message-sender mb-1 text-primary">${message.sender_username}</div>`;
+                        }
+                        
+                        const bubbleClass = message.sender_id == {{ current_user.id }} ? 'bg-primary text-white' : 'bg-light';
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message-bubble p-2 rounded d-inline-block ${bubbleClass}" style="max-width: 75%;">
+                                ${senderInfo}
+                                ${message.body}
+                                <div class="message-info d-flex justify-content-between align-items-center mt-1" style="font-size: 0.8rem;">
+                                    <small class="text-muted">${message.timestamp}</small>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add to messages list
+                        messagesList.appendChild(messageDiv);
+                    });
+                    
+                    // Update the chat preview in the sidebar
+                    if (data.messages.length > 0) {
+                        const latestMessage = data.messages[data.messages.length - 1];
+                        const preview = document.querySelector(`.group-message-preview[data-group-id="${groupId}"]`);
+                        if (preview) {
+                            const senderText = latestMessage.sender_id == {{ current_user.id }} 
+                                ? '<span class="text-muted">You: </span>' 
+                                : `<span class="text-muted">${latestMessage.sender_username}: </span>`;
+                                
+                            preview.innerHTML = senderText + latestMessage.body;
+                        }
+                    }
+                    
+                    // Scroll to bottom
+                    groupMessagesContainer.scrollTop = groupMessagesContainer.scrollHeight;
+                }
+                
+                // Check again after some time
+                setTimeout(checkNewGroupMessages, 5000);
+            })
+            .catch(error => {
+                console.error('Error checking for new group messages:', error);
+                setTimeout(checkNewGroupMessages, 10000);
+            });
+        }
+        
+        // Start checking for new group messages
+        setTimeout(checkNewGroupMessages, 5000);
+        {% endif %}
+        
+        // Periodically check user status to detect offline users more quickly
+        setInterval(function() {
+            chatUsers.forEach(user => {
+                fetch(`/api/user-status/${user.id}`, {
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.hasOwnProperty('online')) {
+                        updateUserStatus(user.id, data.online);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking user status:', error);
+                });
+            });
+        }, 5000); // Check every 5 seconds
+        
+        // Start checking for new messages
+        {% if chat_users %}
+        setTimeout(checkNewMessages, 5000); // Start after 5 seconds
+        {% endif %}
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,130 @@
+{% extends "layout.html" %}
+
+{% block title %}Search - Flask App{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">Global Search</h2>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('search') }}" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" name="q" class="form-control form-control-lg" placeholder="Search users and groups..." value="{{ query }}" autofocus>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                        <div class="form-text text-muted mt-1">Search by name to find users or groups</div>
+                    </form>
+                    
+                    <div class="mt-4">
+                        {% if query %}
+                            {% if users or groups %}
+                                <h3>Search results for "{{ query }}"</h3>
+                                
+                                <!-- Users Results -->
+                                {% if users %}
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h4 class="mb-0">Users ({{ users|length }})</h4>
+                                    </div>
+                                    <div class="list-group list-group-flush">
+                                        {% for user in users %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h5 class="mb-1">
+                                                        {{ user.username }}
+                                                        <span class="badge {% if online_status[user.id] %}bg-success{% else %}bg-secondary{% endif %} rounded-pill ms-2">
+                                                            {% if online_status[user.id] %}Online{% else %}Offline{% endif %}
+                                                        </span>
+                                                    </h5>
+                                                    <p class="mb-1 text-muted">{{ user.email }}</p>
+                                                </div>
+                                                <a href="{{ url_for('chat', user_id=user.id) }}" class="btn btn-primary">
+                                                    <i class="bi bi-chat"></i> Chat
+                                                </a>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Groups Results -->
+                                {% if groups %}
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h4 class="mb-0">Groups ({{ groups|length }})</h4>
+                                    </div>
+                                    <div class="list-group list-group-flush">
+                                        {% for group in groups %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h5 class="mb-1">
+                                                        {{ group.name }}
+                                                        {% if group.creator_id == current_user.id %}
+                                                        <span class="badge bg-primary rounded-pill ms-2">Admin</span>
+                                                        {% endif %}
+                                                    </h5>
+                                                    {% if group.description %}
+                                                    <p class="mb-1">{{ group.description }}</p>
+                                                    {% endif %}
+                                                    <small class="text-muted">{{ group.members.count() }} members</small>
+                                                </div>
+                                                <div>
+                                                    <a href="{{ url_for('group_chat', group_id=group.id) }}" class="btn btn-primary">
+                                                        <i class="bi bi-chat"></i> Open
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <h4 class="alert-heading">No results found</h4>
+                                    <p class="mb-0">No users or groups match your search query "{{ query }}".</p>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center my-5">
+                                <i class="bi bi-search" style="font-size: 4rem; color: #ccc;"></i>
+                                <h3 class="mt-3">Search for users and groups</h3>
+                                <p class="text-muted">Enter a search term to find users and groups</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+                
+                <div>
+                    <a href="{{ url_for('users') }}" class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-people"></i> All Users
+                    </a>
+                    <a href="{{ url_for('create_group') }}" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> Create Group
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ group.name }} - Members{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">{{ group.name }} - Members</h2>
+                <a href="{{ url_for('group_chat', group_id=group.id) }}" class="btn btn-light btn-sm">
+                    <i class="bi bi-chat"></i> Return to Chat
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h4 class="mb-3">Group Information</h4>
+                    <p><strong>Name:</strong> {{ group.name }}</p>
+                    {% if group.description %}
+                    <p><strong>Description:</strong> {{ group.description }}</p>
+                    {% endif %}
+                    <p><strong>Created by:</strong> {{ group.creator.username }}</p>
+                    <p><strong>Created at:</strong> {{ group.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    
+                    {% if group.creator_id == current_user.id %}
+                    <form method="POST" action="{{ url_for('delete_group', group_id=group.id) }}" 
+                          onsubmit="return confirm('Are you sure you want to delete this group? This action cannot be undone.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Delete Group</button>
+                    </form>
+                    {% elif current_user in members %}
+                    <form method="POST" action="{{ url_for('leave_group', group_id=group.id) }}"
+                          onsubmit="return confirm('Are you sure you want to leave this group?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-warning">Leave Group</button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                <hr>
+
+                <div class="mb-4">
+                    <h4 class="mb-3">Members ({{ members|length }})</h4>
+                    <div class="list-group">
+                        {% for member in members %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ member.username }}</strong>
+                                {% if member.id == group.creator_id %}
+                                <span class="badge bg-primary ms-2">Admin</span>
+                                {% endif %}
+                            </div>
+                            {% if is_admin and member.id != current_user.id and member.id != group.creator_id %}
+                            <form method="POST" action="{{ url_for('remove_group_member', group_id=group.id, user_id=member.id) }}"
+                                  onsubmit="return confirm('Are you sure you want to remove this member?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if is_admin and non_members %}
+                <hr>
+
+                <div>
+                    <h4 class="mb-3">Add Members</h4>
+                    <form method="POST" action="{{ url_for('add_group_member', group_id=group.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="user_id" class="form-label">Select User</label>
+                            <select class="form-select" id="user_id" name="user_id" required>
+                                <option value="">Select a user to add...</option>
+                                {% for user in non_members %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success">Add to Group</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
